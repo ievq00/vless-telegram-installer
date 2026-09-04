@@ -1,0 +1,45 @@
+{
+  "sing_box": {
+    "version": "1.14.0",
+    "amd64": {
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.0/sing-box-1.14.0-linux-amd64.tar.gz",
+      "sha256": "2375de6999f4f56ab46b4fc5ddf26a6aba1d3e61a0f4e7ddec2f4690457d5f63"
+    },
+    "arm64": {
+      "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.0/sing-box-1.14.0-linux-arm64.tar.gz",
+      "sha256": "04d9b40bc98dc55b6f509ce3292145c65478f65866bea64826ebb2f382385088"
+    }
+  },
+  "caddy": {
+    "version": "2.11.4",
+    "amd64": {
+      "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_linux_amd64.tar.gz",
+      "sha256": "527fbf917c39189a1e3b31d34fa955601680b2d5c8055d2a87b8b9588dec7bb9"
+    },
+    "arm64": {
+      "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_linux_arm64.tar.gz",
+      "sha256": "52d42ae12b3462097e9868da6dfed3c9648ae12edd3b3638102312af84cb6904"
+    }
+  },
+  "go": {
+    "version": "1.26.5",
+    "amd64": {
+      "url": "https://dl.google.com/go/go1.26.5.linux-amd64.tar.gz",
+      "sha256": "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053"
+    },
+    "arm64": {
+      "url": "https://dl.google.com/go/go1.26.5.linux-arm64.tar.gz",
+      "sha256": "fe4789e92b1f33358680864bbe8704289e7bb5fc207d80623c308935bd696d49"
+    }
+  },
+  "relay": {
+    "revision": "52a5feb7fac38f68da5afef9cedd9b3bfc8473ca",
+    "url": "https://codeload.github.com/telegramdesktop/tproxy-server/tar.gz/52a5feb7fac38f68da5afef9cedd9b3bfc8473ca",
+    "sha256": "2c56987035c7f0b9a3d40907fe9ff8889fd41d1a6dcb7bdd6e0de7784c442bfe"
+  },
+  "backend": {
+    "revision": "0614c35020943b2080c9bd27b5e6336270af389f",
+    "url": "https://codeload.github.com/alexbers/mtprotoproxy/tar.gz/0614c35020943b2080c9bd27b5e6336270af389f",
+    "sha256": "69e5913c2d1e2775a92ae2592542c43984adb95d9103e1842558cbd1e2c6f272"
+  }
+}
