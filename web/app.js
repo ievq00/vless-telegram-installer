@@ -1,0 +1,2 @@
+document.addEventListener('click',async event=>{const button=event.target.closest('[data-copy]');if(!button)return;try{await navigator.clipboard.writeText(button.dataset.copy);const old=button.textContent;button.textContent='Скопировано';setTimeout(()=>button.textContent=old,1800);}catch{button.textContent='Выделите и скопируйте ссылку';}});
+document.addEventListener('submit',event=>{const text=event.target.dataset.confirm;if(text&&!confirm(text))event.preventDefault();});
