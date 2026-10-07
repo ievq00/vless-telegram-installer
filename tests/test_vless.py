@@ -1,5 +1,5 @@
 import unittest
-from vt.vless import email_address, hostname, parse_vless, singbox_config
+from vt.vless import email_address, hostname, parse_vless, singbox_config, singbox_config_many
 
 UUID = "11111111-1111-4111-8111-111111111111"
 BASE = "vless://" + UUID + "@proxy.example.com:443"
@@ -18,6 +18,17 @@ class VlessTests(unittest.TestCase):
     def test_reality(self):
         out = parse_vless(BASE + "?security=reality&pbk=" + "A" * 43 + "&sid=1234&fp=chrome")
         self.assertEqual(out["tls"]["reality"]["short_id"], "1234")
+
+    def test_multiple_servers_use_urltest(self):
+        first = parse_vless(BASE + "?security=tls")
+        second = parse_vless(BASE.replace("proxy.example.com", "other.example.com") + "?security=tls")
+        config = singbox_config_many([first, second], 45)
+        group = config["outbounds"][-1]
+        self.assertEqual(group["type"], "urltest")
+        self.assertEqual(group["interval"], "45m")
+        self.assertEqual(group["idle_timeout"], "87600h")
+        self.assertTrue(group["interrupt_exist_connections"])
+        self.assertEqual(config["route"]["final"], "vless")
 
     def test_websocket_encoded_path(self):
         out = parse_vless(BASE + "?security=tls&type=ws&host=front.example.com&path=%2Fhello%3Fed%3D1")

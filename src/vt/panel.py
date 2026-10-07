@@ -11,6 +11,7 @@ from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 from .common import APP, ETC, PANEL_STATE, password_matches, proxy_link, read_json, revision, validate_users, write_json
+from .vless_sources import validate_vless_settings
 
 escape = lambda value: html.escape(str(value), quote=True)
 
@@ -150,6 +151,22 @@ class Handler(BaseHTTPRequestHandler):
         content += '<form method="post" action="' + self.base + '/logout">' + self.csrf_input(session) + '<button class="secondary">Выйти</button></form></div>'
         if not synced:
             content += pending
+        try:
+            vless = validate_vless_settings(read_json(self.server.state / "vless.json"))
+            vless_state = read_json(self.server.state / "vless-status.json")
+        except (OSError, ValueError):
+            vless, vless_state = {"sources": [], "check_interval_minutes": 30}, {}
+        vless_message, vless_class = "Ожидается применение настроек.", "notice"
+        if vless_state.get("ok"):
+            vless_message = "Работает серверов: " + str(vless_state.get("nodes", 1)) + ". Выбирается минимальная задержка."
+        elif vless_state.get("ok") is False:
+            vless_message = vless_state.get("error", "Новые настройки не применены.")
+            vless_class = "error"
+        content += '<section class="card"><h2>Выход через VLESS</h2><p class="' + vless_class + '">' + escape(vless_message) + '</p>'
+        content += '<form method="post" action="' + self.base + '/vless">' + self.csrf_input(session)
+        content += '<label>VLESS-ссылки или HTTPS-подписки<textarea name="sources" rows="6" required spellcheck="false" placeholder="Одна ссылка в строке">' + escape("\n".join(vless["sources"])) + '</textarea></label>'
+        content += '<div class="row"><label class="grow">Проверять задержку каждые, минут<input type="number" name="check_interval_minutes" min="5" max="1440" value="' + str(vless["check_interval_minutes"]) + '" required></label><button>Сохранить VLESS</button></div></form>'
+        content += '<p class="muted">До 32 серверов. При нескольких ссылках sing-box проверяет HTTPS через каждый сервер и использует вариант с минимальной задержкой. Адрес Telegram-прокси и пользовательские ссылки не меняются.</p></section>'
         content += '<section class="card"><h2>Новое подключение</h2><form method="post" action="' + self.base + '/add" class="row">'
         content += self.csrf_input(session) + '<label class="grow">Название<input name="name" maxlength="60" required placeholder="Например, мой телефон"></label><button>Создать ссылку</button></form><p class="muted">До 32 отдельных ссылок. Нужен Telegram с поддержкой WEB Proxy.</p></section>'
         for user in document["users"]:
@@ -182,7 +199,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Transfer-Encoding"):
             raise ValueError("Передача по частям не поддерживается.")
         length = int(self.headers.get("Content-Length", "0"))
-        if length <= 0 or length > 16384:
+        if length <= 0 or length > 65536:
             raise ValueError("Некорректный размер запроса.")
         if self.headers.get("Content-Type", "").split(";")[0] != "application/x-www-form-urlencoded":
             raise ValueError("Некорректный тип запроса.")
@@ -229,6 +246,16 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.sessions.pop(self.cookie("__Host-vt_session"), None)
             return self.response(303, cookie="__Host-vt_session=; Max-Age=0", location=self.base + "/login")
         action = path.removeprefix(self.base + "/")
+        if action == "vless":
+            try:
+                interval = int(data.get("check_interval_minutes", ""))
+            except ValueError as exc:
+                raise ValueError("Некорректный интервал проверки.") from exc
+            settings = validate_vless_settings({"sources": data.get("sources", "").splitlines(),
+                                                "check_interval_minutes": interval})
+            with self.server.lock:
+                write_json(self.server.state / "vless.json", settings, mode=0o600)
+            return self.response(303, location=self.base + "/users")
         if action not in ("add", "toggle", "rotate", "delete"):
             return self.response(404, "Страница не найдена.", "text/plain; charset=utf-8")
         with self.server.lock:

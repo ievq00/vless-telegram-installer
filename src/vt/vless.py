@@ -3,6 +3,7 @@ import base64
 import ipaddress
 import re
 import uuid
+import copy
 from urllib.parse import parse_qs, unquote, urlsplit
 
 
@@ -142,10 +143,37 @@ def parse_vless(link):
 
 
 def singbox_config(outbound, port=1080):
+    return singbox_config_many([outbound], 30, port)
+
+
+def singbox_config_many(outbounds, interval_minutes=30, port=1080):
+    """Build a SOCKS configuration with automatic real-traffic latency selection."""
+    if not 1 <= len(outbounds) <= 32:
+        raise ValueError("Нужно от 1 до 32 VLESS-серверов.")
+    if type(interval_minutes) is not int or not 5 <= interval_minutes <= 1440:
+        raise ValueError("Интервал проверки должен быть от 5 до 1440 минут.")
+    nodes = []
+    for index, value in enumerate(outbounds, 1):
+        node = copy.deepcopy(value)
+        node["tag"] = "vless-" + str(index)
+        nodes.append(node)
+    if len(nodes) == 1:
+        nodes[0]["tag"] = "vless"
+    else:
+        nodes.append({
+            "type": "urltest", "tag": "vless",
+            "outbounds": [node["tag"] for node in nodes],
+            "url": "https://www.gstatic.com/generate_204",
+            "interval": str(interval_minutes) + "m",
+            "tolerance": 30,
+            # The requested cadence should continue even when Telegram is quiet.
+            "idle_timeout": "87600h",
+            "interrupt_exist_connections": True,
+        })
     return {
         "log": {"level": "warn", "timestamp": True},
         "dns": {"servers": [{"type": "local", "tag": "system"}]},
         "inbounds": [{"type": "socks", "tag": "telegram", "listen": "127.0.0.1", "listen_port": port}],
-        "outbounds": [outbound],
+        "outbounds": nodes,
         "route": {"final": "vless", "default_domain_resolver": "system"},
     }

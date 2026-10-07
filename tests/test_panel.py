@@ -30,6 +30,8 @@ class PanelTests(unittest.TestCase):
 
     def setUp(self):
         write_json(self.state / "users.json", copy.deepcopy(DOCUMENT))
+        write_json(self.state / "vless.json", {"sources": ["vless://11111111-1111-1111-1111-111111111111@node.example.com:443?security=tls"], "check_interval_minutes": 30})
+        write_json(self.state / "vless-status.json", {"ok": True, "nodes": 1})
 
     def request(self, method, path, fields=None, cookie="", origin="https://proxy.example.test"):
         conn = http.client.HTTPConnection(*self.server.server_address, timeout=5)
@@ -83,3 +85,23 @@ class PanelTests(unittest.TestCase):
         code, _, _ = self.request("POST", self.base + "/toggle", {"csrf": csrf, "id": "a" * 16}, cookie)
         self.assertEqual(code, 400)
         self.assertTrue(read_json(self.state / "users.json")["users"][0]["enabled"])
+
+    def test_vless_sources_and_interval_can_be_changed(self):
+        cookie, csrf = self.login()
+        one = "vless://22222222-2222-2222-2222-222222222222@one.example.com:443?security=tls"
+        two = "vless://33333333-3333-3333-3333-333333333333@two.example.com:443?security=tls"
+        code, _, _ = self.request("POST", self.base + "/vless",
+                                  {"csrf": csrf, "sources": one + "\n" + two,
+                                   "check_interval_minutes": "15"}, cookie)
+        self.assertEqual(code, 303)
+        saved = read_json(self.state / "vless.json")
+        self.assertEqual(saved["sources"], [one, two])
+        self.assertEqual(saved["check_interval_minutes"], 15)
+
+    def test_vless_values_are_html_escaped(self):
+        write_json(self.state / "vless.json", {"sources": ["https://sub.example.com/?x=<script>"],
+                                                "check_interval_minutes": 30})
+        cookie, _ = self.login()
+        _, _, body = self.request("GET", self.base + "/users", cookie=cookie)
+        self.assertIn("&lt;script&gt;", body)
+        self.assertNotIn("<script>", body)

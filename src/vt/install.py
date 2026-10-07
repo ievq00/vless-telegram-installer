@@ -20,7 +20,7 @@ from . import __version__
 from .common import APP, ETC, STATE, PANEL_STATE, UNITS, atomic_write, password_hash, proxy_link, read_json, revision, validate_users, write_json
 from .downloads import download, extract
 from .render import caddyfile, relay_config, service, site, units
-from .vless import email_address, hostname, parse_vless, singbox_config
+from .vless import email_address, hostname, parse_vless, singbox_config_many
 
 SOURCE = Path(__file__).resolve().parents[2]
 CACHE = Path("/var/cache/vless-telegram")
@@ -173,7 +173,17 @@ def save_configuration(data, outbound, old, laboratory):
     current["admin_password"] = old.get("admin_password") or secrets.token_urlsafe(24)
     current["password_hash"] = old.get("password_hash") or password_hash(current["admin_password"])
     write_json(ETC / "installation.json", current)
-    write_json(ETC / "sing-box.json", singbox_config(outbound), mode=0o640, gid=grp.getgrnam("vt-vless").gr_gid)
+    vless_path = PANEL_STATE / "vless.json"
+    replace_vless = not vless_path.exists() or old.get("vless_uri") != data["vless_uri"]
+    if replace_vless:
+        panel_account = pwd.getpwnam("vt-panel")
+        write_json(vless_path, {"sources": [data["vless_uri"]], "check_interval_minutes": 30},
+                   mode=0o600, uid=panel_account.pw_uid, gid=panel_account.pw_gid)
+    from .vless_sources import resolve_vless_settings, validate_vless_settings
+    vless_settings = validate_vless_settings(read_json(vless_path))
+    vless_outbounds, vless_links = resolve_vless_settings(vless_settings)
+    write_json(ETC / "sing-box.json", singbox_config_many(vless_outbounds, vless_settings["check_interval_minutes"]),
+               mode=0o640, gid=grp.getgrnam("vt-vless").gr_gid)
     write_json(ETC / "panel.json", {k: current[k] for k in ("domain", "panel_path", "password_hash")},
                mode=0o640, gid=grp.getgrnam("vt-panel").gr_gid)
     if not (PANEL_STATE / "users.json").exists():
@@ -193,6 +203,9 @@ def save_configuration(data, outbound, old, laboratory):
         atomic_write(APP / "site" / "index.html", site(current["domain"]), mode=0o644)
     write_json(STATE / "applied-users.json", document)
     write_json(PANEL_STATE / "status.json", {"revision": revision(document), "ok": True},
+               mode=0o640, gid=grp.getgrnam("vt-panel").gr_gid)
+    write_json(PANEL_STATE / "vless-status.json", {"ok": True, "time": int(time.time()),
+               "nodes": len(vless_links), "check_interval_minutes": vless_settings["check_interval_minutes"]},
                mode=0o640, gid=grp.getgrnam("vt-panel").gr_gid)
     return current
 
@@ -240,7 +253,8 @@ class Snapshot:
 
     def restore(self):
         say("Установка не завершена. Восстанавливаю предыдущие службы.")
-        subprocess.run(["systemctl", "stop", "vt-sync.path", *[x + ".service" for x in UNITS]], capture_output=True, timeout=60)
+        subprocess.run(["systemctl", "stop", "vt-sync.path", "vt-vless-sync.path",
+                        *[x + ".service" for x in UNITS]], capture_output=True, timeout=60)
         for target, source in self.saved:
             copy_owned_tree(source, target)
         for unit in self.unit_names:
@@ -307,7 +321,8 @@ def install(options):
     check_dns(data["domain"], options.lab)
     snapshot = Snapshot(old)
     try:
-        subprocess.run(["systemctl", "stop", "vt-sync.path", "vt-sync.service"], capture_output=True, timeout=90)
+        subprocess.run(["systemctl", "stop", "vt-sync.path", "vt-sync.service",
+                        "vt-vless-sync.path", "vt-vless-sync.service"], capture_output=True, timeout=90)
         accounts()
         shutil.copytree(SOURCE / "src", APP / "src", dirs_exist_ok=True)
         shutil.copytree(SOURCE / "web", APP / "web", dirs_exist_ok=True)
@@ -373,8 +388,8 @@ def install(options):
         else:
             raise RuntimeError("Проверка HTTPS/Telegram не прошла: " + last_error + ". Проверьте DNS и входящие порты 80/443 у хостинга.")
         say("7/7 · Включаю автозапуск и сохраняю данные доступа.")
-        run(["systemctl", "enable", *[x + ".service" for x in UNITS], "vt-sync.path"], capture=True)
-        run(["systemctl", "start", "vt-sync.path"])
+        run(["systemctl", "enable", *[x + ".service" for x in UNITS], "vt-sync.path", "vt-vless-sync.path"], capture=True)
+        run(["systemctl", "start", "vt-sync.path", "vt-vless-sync.path"])
         access = "Telegram WEB Proxy\n" + proxy_link(current["domain"], secret) + "\n\n"
         access += "Панель: https://" + current["domain"] + current["panel_path"] + "/login\n"
         access += "Логин: admin\nПароль: " + current["admin_password"] + "\n"

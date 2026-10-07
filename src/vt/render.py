@@ -83,6 +83,29 @@ Unit=vt-sync.service
 [Install]
 WantedBy=multi-user.target
 """,
+        "vt-vless-sync.service": f"""[Unit]
+Description=Validate and apply VLESS source changes
+After=network-online.target vt-vless.service
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH={APP}/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m vt.vless_control
+TimeoutStartSec=180s
+{BASE_HARDENING}UMask=0077
+ReadWritePaths={ETC} {PANEL_STATE} {STATE}
+""",
+        "vt-vless-sync.path": f"""[Unit]
+Description=Watch VLESS source changes
+
+[Path]
+PathChanged={PANEL_STATE}/vless.json
+Unit=vt-vless-sync.service
+
+[Install]
+WantedBy=multi-user.target
+""",
     }
     return result
 
