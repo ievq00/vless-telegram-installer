@@ -92,7 +92,7 @@ Type=oneshot
 Environment=PYTHONPATH={APP}/src
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/usr/bin/python3 -m vt.vless_control
-TimeoutStartSec=180s
+TimeoutStartSec=240s
 {BASE_HARDENING}UMask=0077
 ReadWritePaths={ETC} {PANEL_STATE} {STATE}
 """,
