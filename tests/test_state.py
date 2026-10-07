@@ -4,9 +4,10 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
-from vt.common import password_hash, password_matches, validate_users
+from vt.common import ensure_relay_token_key, password_hash, password_matches, validate_users
 from vt.control import materialize
 from vt.downloads import extract
+from vt.render import relay_config
 
 DOCUMENT = {"users": [{"id": "a" * 16, "name": "Основное", "secret": "b" * 32, "enabled": True}]}
 
@@ -65,3 +66,18 @@ class StateTests(unittest.TestCase):
                 bundle.addfile(info)
             with self.assertRaises(ValueError):
                 extract(archive, Path(scratch) / "out")
+
+    def test_relay_token_key_is_persistent_and_private(self):
+        with tempfile.TemporaryDirectory() as scratch:
+            path = Path(scratch) / "relay-token.key"
+            ensure_relay_token_key(path)
+            first = path.read_bytes()
+            self.assertEqual(len(first), 32)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            ensure_relay_token_key(path)
+            self.assertEqual(path.read_bytes(), first)
+
+    def test_relay_config_uses_persistent_token_key(self):
+        config = relay_config("proxy.example.com")
+        self.assertTrue(config["token_key_file"].replace("\\", "/").endswith(
+            "/etc/vless-telegram/relay-token.key"))

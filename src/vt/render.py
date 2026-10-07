@@ -113,6 +113,7 @@ WantedBy=multi-user.target
 def relay_config(domain):
     return {"public_hostname": domain, "listen": "127.0.0.1:8080",
             "admin_listen": "127.0.0.1:8081", "public_dir": str(APP / "site"),
+            "token_key_file": str(ETC / "relay-token.key"),
             "profiles_file": str(ETC / "profiles.json")}
 
 

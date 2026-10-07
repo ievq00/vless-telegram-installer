@@ -34,6 +34,20 @@ def atomic_write(path, data, mode=0o600, uid=None, gid=None):
             os.unlink(tmp)
 
 
+def ensure_relay_token_key(path, uid=None, gid=None):
+    path = Path(path)
+    if path.exists():
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError("Файл ключа WEB relay должен быть обычным файлом.")
+        if len(path.read_bytes()) != 32:
+            raise RuntimeError("Файл ключа WEB relay должен содержать ровно 32 байта.")
+        path.chmod(0o600)
+        if uid is not None or gid is not None:
+            os.chown(path, -1 if uid is None else uid, -1 if gid is None else gid)
+        return
+    atomic_write(path, secrets.token_bytes(32), mode=0o600, uid=uid, gid=gid)
+
+
 def write_json(path, value, **kwargs):
     atomic_write(path, json.dumps(value, ensure_ascii=False, indent=2) + "\n", **kwargs)
 

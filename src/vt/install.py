@@ -17,7 +17,7 @@ import tempfile
 import time
 from pathlib import Path
 from . import __version__
-from .common import APP, ETC, STATE, PANEL_STATE, UNITS, atomic_write, password_hash, proxy_link, read_json, revision, validate_users, write_json
+from .common import APP, ETC, STATE, PANEL_STATE, UNITS, atomic_write, ensure_relay_token_key, password_hash, proxy_link, read_json, revision, validate_users, write_json
 from .downloads import download, extract
 from .render import caddyfile, relay_config, service, site, units
 from .vless import email_address, hostname, parse_vless, singbox_config_many
@@ -195,7 +195,10 @@ def save_configuration(data, outbound, old, laboratory):
     from .control import materialize
     keys, profiles = materialize(document)
     write_json(ETC / "backend-users.json", keys, mode=0o640, gid=grp.getgrnam("vt-backend").gr_gid)
-    write_json(ETC / "profiles.json", profiles, mode=0o600, uid=pwd.getpwnam("vt-relay").pw_uid, gid=grp.getgrnam("vt-relay").gr_gid)
+    relay_account = pwd.getpwnam("vt-relay")
+    write_json(ETC / "profiles.json", profiles, mode=0o600,
+               uid=relay_account.pw_uid, gid=relay_account.pw_gid)
+    ensure_relay_token_key(ETC / "relay-token.key", relay_account.pw_uid, relay_account.pw_gid)
     write_json(ETC / "relay.json", relay_config(current["domain"]), mode=0o644)
     atomic_write(ETC / "Caddyfile", caddyfile(current["domain"], current["email"], current["panel_path"], laboratory), mode=0o644)
     (APP / "site").mkdir(exist_ok=True)

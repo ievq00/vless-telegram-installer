@@ -33,9 +33,9 @@
     }
   },
   "relay": {
-    "revision": "52a5feb7fac38f68da5afef9cedd9b3bfc8473ca",
-    "url": "https://codeload.github.com/telegramdesktop/tproxy-server/tar.gz/52a5feb7fac38f68da5afef9cedd9b3bfc8473ca",
-    "sha256": "2c56987035c7f0b9a3d40907fe9ff8889fd41d1a6dcb7bdd6e0de7784c442bfe"
+    "revision": "c8adb8b7c6b7fc46c12ae3acb68be9070c26a8e8",
+    "url": "https://codeload.github.com/telegramdesktop/tproxy-server/tar.gz/c8adb8b7c6b7fc46c12ae3acb68be9070c26a8e8",
+    "sha256": "a78b48f536180143dd7005785ca397310c36ee0b132e19949a45d64f586ab549"
   },
   "backend": {
     "revision": "0614c35020943b2080c9bd27b5e6336270af389f",
