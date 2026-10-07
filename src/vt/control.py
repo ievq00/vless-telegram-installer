@@ -9,7 +9,7 @@ def materialize(document):
     enabled = [u for u in validate_users(document)["users"] if u["enabled"]]
     keys = {u["id"]: u["secret"] for u in enabled}
     profiles = {"profiles": [
-        {"name": u["id"], "secret": u["secret"], "backend": "127.0.0.1:2398", "carrier_mode": "websocket"}
+        {"name": u["id"], "secret": u["secret"], "backend": "127.0.0.1:2398", "carrier_mode": "websocket-lanes"}
         for u in enabled
     ]}
     return keys, profiles

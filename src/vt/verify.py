@@ -27,11 +27,10 @@ class WebSocket:
         self.buffered = buffered
 
     @classmethod
-    def connect(cls, domain, token, origin, context, timeout):
+    def connect(cls, domain, protocol, origin, context, timeout):
         raw = socket.create_connection((domain, 443), timeout=timeout)
         sock = context.wrap_socket(raw, server_hostname=domain)
         key = base64.b64encode(os.urandom(16)).decode()
-        protocol = "tproxy-v1." + token
         request = (
             "GET /api/v1/ws HTTP/1.1\r\n"
             f"Host: {domain}\r\n"
@@ -190,7 +189,7 @@ def verify(domain, secret_text, ca_file=None, timeout=15, dc=2, direct=False, ba
         status, headers, body = request("/api/v1/session", frame(0x10, 0, b"\x01"), bootstrap)
         token = next(value for key, value in headers.items() if key.lower() == "x-session-token")
         carrier_mode = next((value.lower() for key, value in headers.items() if key.lower() == "x-carrier-mode"), "https")
-        assert carrier_mode in ("https", "websocket"), "Unsupported relay carrier mode"
+        assert carrier_mode in ("https", "websocket", "websocket-lanes"), "Unsupported relay carrier mode"
         assert list(frames(body)) == [(0x11, 0, b"")], "Relay WELCOME missing"
     try:
         key_secret = secret[1:] if len(secret) == 17 and secret[0] == 0xDD else secret
@@ -215,8 +214,10 @@ def verify(domain, secret_text, ca_file=None, timeout=15, dc=2, direct=False, ba
         if direct:
             sock = socket.create_connection(("127.0.0.1", backend_port), timeout=12)
             sock.sendall(packet)
-        elif carrier_mode == "websocket":
-            websocket = WebSocket.connect(domain, token, origin, context, timeout)
+        elif carrier_mode in ("websocket", "websocket-lanes"):
+            protocol = ("tproxy-v1." + token if carrier_mode == "websocket" else
+                        "tproxy-lane-v1." + token + ".1")
+            websocket = WebSocket.connect(domain, protocol, origin, context, timeout)
             websocket.send_binary(frame(1, 1) + frame(2, 1, packet))
         else:
             status, headers, body = request("/api/v1/up", frame(1, 1) + frame(2, 1, packet), token, {"X-Up-Seq": "1"})
@@ -229,7 +230,7 @@ def verify(domain, secret_text, ca_file=None, timeout=15, dc=2, direct=False, ba
                 chunk = sock.recv(4096)
                 assert chunk, "MTProxy backend closed the test stream"
                 received += decrypt.update(chunk)
-            elif carrier_mode == "websocket":
+            elif carrier_mode in ("websocket", "websocket-lanes"):
                 body = websocket.receive_binary()
                 for kind, stream, chunk in frames(body):
                     if kind == 3 and stream == 1:
