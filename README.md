@@ -36,7 +36,7 @@ sudo cat /etc/vless-telegram/access.txt
 
 ## Совместимость Telegram
 
-Это **WEB Proxy** с HTTPS-транспортом. Нужна версия Telegram, поддерживающая именно этот тип прокси. Обычный клиент без WEB Proxy использовать такую ссылку не сможет.
+Это **WEB Proxy** с защищённым WebSocket-транспортом (WSS). Нужна версия Telegram, поддерживающая именно этот тип прокси. Обычный клиент без WEB Proxy использовать такую ссылку не сможет. WebSocket используется для устойчивой загрузки фото и видео при заметной задержке до сервера.
 
 В [проекте Telegram](https://github.com/telegramdesktop/tproxy-server#6-configure-a-telegram-client) описаны реализация для Desktop, экспериментальный Android-клиент и план для iOS. Поддержка не гарантируется во всех магазинных версиях. Если `t.me/webproxy` открывает обычную веб-страницу, передайте домен и секрет непосредственно в поддерживающий WEB Proxy клиент; он также может принимать `tg://webproxy`.
 
@@ -44,7 +44,7 @@ sudo cat /etc/vless-telegram/access.txt
 
 ```text
 Telegram с поддержкой WEB Proxy
-  → HTTPS :443 / Caddy
+  → WSS :443 / Caddy
   → Telegram WEB relay
   → MTProto backend
   → локальный SOCKS / sing-box
@@ -117,7 +117,7 @@ sudo journalctl -u vt-vless -u vt-backend -u vt-relay -u vt-caddy -n 80 --no-pag
 sudo env PYTHONPATH=/opt/vless-telegram/src python3 -m vt.verify
 ```
 
-Последняя команда проверяет HTTPS и ответ Telegram. Если изменения панели не применились:
+Последняя команда проверяет WSS-реле и ответ Telegram. Если изменения панели не применились:
 
 ```bash
 sudo journalctl -u vt-sync -n 60 --no-pager
