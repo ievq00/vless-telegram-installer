@@ -172,6 +172,7 @@ def singbox_config_many(outbounds, interval_minutes=30, port=1080):
         })
     return {
         "log": {"level": "warn", "timestamp": True},
+        "experimental": {"clash_api": {"external_controller": "127.0.0.1:19090"}},
         "dns": {"servers": [{"type": "local", "tag": "system"}]},
         "inbounds": [{"type": "socks", "tag": "telegram", "listen": "127.0.0.1", "listen_port": port}],
         "outbounds": nodes,

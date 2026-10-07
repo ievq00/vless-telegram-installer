@@ -4,10 +4,11 @@ import re
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from pathlib import Path
 from urllib.parse import urlencode
 from vt.common import password_hash, read_json, write_json
-from vt.panel import PanelServer
+from vt.panel import PanelServer, active_vless
 from test_state import DOCUMENT
 
 
@@ -105,3 +106,25 @@ class PanelTests(unittest.TestCase):
         _, _, body = self.request("GET", self.base + "/users", cookie=cookie)
         self.assertIn("&lt;script&gt;", body)
         self.assertNotIn("<script>", body)
+
+    def test_current_vless_node_is_shown(self):
+        write_json(self.state / "vless-status.json", {
+            "ok": True, "nodes": 1, "active_tag": "vless",
+            "node_details": [{"tag": "vless", "name": "Amsterdam",
+                              "address": "node.example.com:443"}],
+        })
+        cookie, _ = self.login()
+        _, _, body = self.request("GET", self.base + "/users", cookie=cookie)
+        self.assertIn("Сейчас используется", body)
+        self.assertIn("Amsterdam", body)
+        self.assertIn("node.example.com:443", body)
+
+    def test_current_urltest_selection_is_read_live(self):
+        status = {"active_tag": "vless-1", "node_details": [
+            {"tag": "vless-1", "name": "First", "address": "one.example.com:443"},
+            {"tag": "vless-2", "name": "Second", "address": "two.example.com:443"},
+        ]}
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"now":"vless-2"}'
+        with mock.patch("vt.panel.urlopen", return_value=response):
+            self.assertEqual(active_vless(status)["tag"], "vless-2")

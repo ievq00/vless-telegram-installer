@@ -29,6 +29,8 @@ class VlessTests(unittest.TestCase):
         self.assertEqual(group["idle_timeout"], "87600h")
         self.assertTrue(group["interrupt_exist_connections"])
         self.assertEqual(config["route"]["final"], "vless")
+        self.assertEqual(config["experimental"]["clash_api"]["external_controller"],
+                         "127.0.0.1:19090")
 
     def test_websocket_encoded_path(self):
         out = parse_vless(BASE + "?security=tls&type=ws&host=front.example.com&path=%2Fhello%3Fed%3D1")

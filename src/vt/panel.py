@@ -10,10 +10,34 @@ import time
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
+from urllib.request import Request, urlopen
 from .common import APP, ETC, PANEL_STATE, password_matches, proxy_link, read_json, revision, validate_users, write_json
 from .vless_sources import validate_vless_settings
 
 escape = lambda value: html.escape(str(value), quote=True)
+VLESS_API = "http://127.0.0.1:19090/proxies/vless"
+
+
+def active_vless(status):
+    details = status.get("node_details", []) if isinstance(status, dict) else []
+    details = [item for item in details
+               if isinstance(item, dict) and isinstance(item.get("tag"), str)]
+    if not details:
+        return None
+    tag = status.get("active_tag", "")
+    if len(details) == 1:
+        tag = details[0]["tag"]
+    else:
+        try:
+            with urlopen(Request(VLESS_API, headers={"Accept": "application/json"}), timeout=1) as response:
+                raw = response.read(65537)
+            if len(raw) <= 65536:
+                current = json.loads(raw.decode("utf-8")).get("now", "")
+                if isinstance(current, str) and current:
+                    tag = current
+        except Exception:
+            pass
+    return next((item for item in details if item["tag"] == tag), None)
 
 
 class PanelServer(ThreadingHTTPServer):
@@ -162,9 +186,15 @@ class Handler(BaseHTTPRequestHandler):
         elif vless_state.get("ok") is False:
             vless_message = vless_state.get("error", "Новые настройки не применены.")
             vless_class = "error"
+        current = active_vless(vless_state)
+        if current:
+            active = '<p class="notice"><strong>Сейчас используется:</strong> ' + escape(current.get("name", "VLESS")) + ' · <code>' + escape(current.get("address", "")) + '</code></p>'
+        else:
+            active = '<p class="muted"><strong>Сейчас используется:</strong> текущий узел появится после успешной проверки.</p>'
         content += '<section class="card"><h2>Выход через VLESS</h2><p class="' + vless_class + '">' + escape(vless_message) + '</p>'
+        content += active
         content += '<form method="post" action="' + self.base + '/vless">' + self.csrf_input(session)
-        content += '<label>VLESS-ссылки или HTTPS-подписки<textarea name="sources" rows="6" required spellcheck="false" placeholder="Одна ссылка в строке">' + escape("\n".join(vless["sources"])) + '</textarea></label>'
+        content += '<label>VLESS-ссылки или HTTP/HTTPS-подписки<textarea name="sources" rows="6" required spellcheck="false" placeholder="Одна ссылка в строке">' + escape("\n".join(vless["sources"])) + '</textarea></label>'
         content += '<div class="row"><label class="grow">Проверять задержку каждые, минут<input type="number" name="check_interval_minutes" min="5" max="1440" value="' + str(vless["check_interval_minutes"]) + '" required></label><button>Сохранить VLESS</button></div></form>'
         content += '<p class="muted">До 32 серверов. При нескольких ссылках sing-box проверяет HTTPS через каждый сервер и использует вариант с минимальной задержкой. Адрес Telegram-прокси и пользовательские ссылки не меняются.</p></section>'
         content += '<section class="card"><h2>Новое подключение</h2><form method="post" action="' + self.base + '/add" class="row">'

@@ -1,15 +1,19 @@
 """Privileged application of VLESS sources saved by the unprivileged panel."""
 import fcntl
 import grp
+import json
 import os
 import subprocess
 import time
+from urllib.parse import unquote, urlsplit
+from urllib.request import urlopen
 from .common import APP, ETC, PANEL_STATE, STATE, atomic_write, read_json, write_json
 from .vless import singbox_config_many
 from .vless_sources import resolve_vless_settings, validate_vless_settings
 
 ROUTE_UNITS = ("vt-vless.service", "vt-backend.service", "vt-relay.service")
 DEPENDENT_UNITS = ("vt-backend.service", "vt-relay.service")
+CLASH_CONTROLLER = "127.0.0.1:19090"
 
 
 def _status(value):
@@ -54,6 +58,38 @@ def _verify_route():
     raise RuntimeError("Ни один VLESS-сервер не передаёт трафик в Telegram.")
 
 
+def _node_details(outbounds, links):
+    multiple = len(outbounds) > 1
+    details = []
+    for number, (outbound, link) in enumerate(zip(outbounds, links), 1):
+        name = unquote(urlsplit(link).fragment).strip()
+        name = "".join(character for character in name if ord(character) >= 32)[:80]
+        server = str(outbound.get("server", ""))
+        port = int(outbound.get("server_port", 0) or 0)
+        address = ("[" + server + "]" if ":" in server else server) + (":" + str(port) if port else "")
+        details.append({"tag": "vless-" + str(number) if multiple else "vless",
+                        "name": name or "Сервер " + str(number), "address": address})
+    return details
+
+
+def _active_tag(node_count):
+    if node_count == 1:
+        return "vless"
+    for attempt in range(5):
+        try:
+            with urlopen("http://" + CLASH_CONTROLLER + "/proxies/vless", timeout=2) as response:
+                raw = response.read(65537)
+            if len(raw) <= 65536:
+                value = json.loads(raw.decode("utf-8")).get("now", "")
+                if isinstance(value, str) and value:
+                    return value
+        except Exception:
+            pass
+        if attempt < 4:
+            time.sleep(1)
+    return ""
+
+
 def apply():
     STATE.mkdir(parents=True, exist_ok=True)
     settings = validate_vless_settings(read_json(PANEL_STATE / "vless.json"))
@@ -63,7 +99,6 @@ def apply():
         try:
             outbounds, links = resolve_vless_settings(settings)
             config = singbox_config_many(outbounds, settings["check_interval_minutes"])
-            import json
             candidate = (json.dumps(config, ensure_ascii=False, indent=2) + "\n").encode()
             temporary = ETC / ".sing-box.candidate.json"
             try:
@@ -76,7 +111,9 @@ def apply():
             _restart(ROUTE_UNITS)
             _verify_route()
             _status({"ok": True, "time": int(time.time()), "nodes": len(links),
-                     "check_interval_minutes": settings["check_interval_minutes"]})
+                     "check_interval_minutes": settings["check_interval_minutes"],
+                     "node_details": _node_details(outbounds, links),
+                     "active_tag": _active_tag(len(links))})
         except Exception as exc:
             atomic_write(ETC / "sing-box.json", old, mode=0o640, gid=grp.getgrnam("vt-vless").gr_gid)
             try:

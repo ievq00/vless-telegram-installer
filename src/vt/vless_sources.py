@@ -1,4 +1,4 @@
-"""Validation and expansion of direct VLESS links and HTTPS subscriptions."""
+"""Validation and expansion of direct VLESS links and HTTP(S) subscriptions."""
 import base64
 import ipaddress
 import socket
@@ -27,9 +27,10 @@ def validate_vless_settings(document):
             raise ValueError("Некорректный источник VLESS.")
         source = source.strip()
         if not source or len(source) > 8192 or any(ord(char) < 32 for char in source):
-            raise ValueError("Каждая строка должна содержать одну VLESS-ссылку или HTTPS-подписку.")
-        if not (source.lower().startswith("vless://") or source.lower().startswith("https://")):
-            raise ValueError("Поддерживаются строки vless:// и HTTPS-подписки.")
+            raise ValueError("Каждая строка должна содержать одну VLESS-ссылку или HTTP(S)-подписку.")
+        if not (source.lower().startswith("vless://") or
+                source.lower().startswith(("http://", "https://"))):
+            raise ValueError("Поддерживаются строки vless:// и HTTP(S)-подписки.")
         if source in seen:
             raise ValueError("Одинаковый источник указан несколько раз.")
         seen.add(source)
@@ -38,15 +39,17 @@ def validate_vless_settings(document):
 
 def _public_subscription_url(url):
     parsed = urlsplit(url)
-    if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
-        raise ValueError("Подписка должна быть обычной HTTPS-ссылкой без логина и фрагмента.")
+    scheme = parsed.scheme.lower()
+    if scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
+        raise ValueError("Подписка должна быть обычной HTTP(S)-ссылкой без логина и фрагмента.")
     try:
-        addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, parsed.port or 443,
+        addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname,
+                                                               parsed.port or (443 if scheme == "https" else 80),
                                                                type=socket.SOCK_STREAM)}
     except socket.gaierror as exc:
         raise ValueError("Не удалось определить адрес сервера подписки.") from exc
     if not addresses or any(not ipaddress.ip_address(value).is_global for value in addresses):
-        raise ValueError("Подписка должна находиться на публичном HTTPS-сервере.")
+        raise ValueError("Подписка должна находиться на публичном HTTP(S)-сервере.")
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -57,7 +60,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 def fetch_subscription(url):
     _public_subscription_url(url)
     request = urllib.request.Request(url, headers={"User-Agent": "vless-telegram-installer/1.1"})
-    opener = urllib.request.build_opener(_NoRedirect, urllib.request.HTTPSHandler(context=ssl.create_default_context()))
+    opener = urllib.request.build_opener(_NoRedirect, urllib.request.HTTPHandler(),
+                                         urllib.request.HTTPSHandler(context=ssl.create_default_context()))
     try:
         with opener.open(request, timeout=20) as response:
             data = response.read(MAX_SUBSCRIPTION + 1)
