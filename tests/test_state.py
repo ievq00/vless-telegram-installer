@@ -25,7 +25,7 @@ class StateTests(unittest.TestCase):
         self.assertEqual(len(users), 1)
         self.assertEqual(len(profiles["profiles"]), 1)
         self.assertEqual(profiles["profiles"][0]["backend"], "127.0.0.1:2398")
-        self.assertEqual(profiles["profiles"][0]["carrier_mode"], "websocket-lanes")
+        self.assertEqual(profiles["profiles"][0]["carrier_mode"], "websocket")
 
     def test_invalid_state_cannot_inject_privileged_commands(self):
         mutations = [
