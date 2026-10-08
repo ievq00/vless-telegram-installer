@@ -168,7 +168,9 @@ def singbox_config_many(outbounds, interval_minutes=30, port=1080):
             "tolerance": 30,
             # The requested cadence should continue even when Telegram is quiet.
             "idle_timeout": "87600h",
-            "interrupt_exist_connections": True,
+            # Re-select the fastest node for new connections without tearing
+            # down Telegram media streams that are already transferring data.
+            "interrupt_exist_connections": False,
         })
     return {
         "log": {"level": "warn", "timestamp": True},

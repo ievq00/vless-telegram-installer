@@ -27,7 +27,7 @@ class VlessTests(unittest.TestCase):
         self.assertEqual(group["type"], "urltest")
         self.assertEqual(group["interval"], "45m")
         self.assertEqual(group["idle_timeout"], "87600h")
-        self.assertTrue(group["interrupt_exist_connections"])
+        self.assertFalse(group["interrupt_exist_connections"])
         self.assertEqual(config["route"]["final"], "vless")
         self.assertEqual(config["experimental"]["clash_api"]["external_controller"],
                          "127.0.0.1:19090")
